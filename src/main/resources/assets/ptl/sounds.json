@@ -1,0 +1,10 @@
+{
+  "entity.peng_tie_lin.ambient": {
+    "subtitle": "subtitles.entity.peng_tie_lin.ambient",
+    "sounds": [ "ptl:idle" ]
+  },
+  "entity.peng_tie_lin.hurt": {
+    "subtitle": "subtitles.entity.peng_tie_lin.hurt",
+    "sounds": [ "ptl:hurt" ]
+  }
+}
