@@ -1,8 +1,6 @@
 package com.ptl;
 
 import net.minecraft.entity.EntityType;
-// 导入 ItemEntity，用于手动生成掉落物
-import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -19,9 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class PtlEntity extends AnimalEntity {
 
-    // 【测试修改 1】把时间改短！
-    // 60 tick = 3秒。测试完记得改回 6000 + random.nextInt(6000)
-    public int poopTime = 60;
+    public int poopTime = this.random.nextInt(6000) + 6000;
 
     public PtlEntity(EntityType<? extends AnimalEntity> entityType, World world) {
         super(entityType, world);
@@ -56,45 +52,54 @@ public class PtlEntity extends AnimalEntity {
     }
 
     @Override
-    protected SoundEvent getAmbientSound() {
-        return Ptl.PTL_AMBIENT_EVENT;
-    }
-
+    protected SoundEvent getAmbientSound() { return Ptl.PTL_AMBIENT_EVENT; }
     @Override
-    protected SoundEvent getHurtSound(net.minecraft.entity.damage.DamageSource source) {
-        return Ptl.PTL_HURT_EVENT;
-    }
-
+    protected SoundEvent getHurtSound(net.minecraft.entity.damage.DamageSource source) { return Ptl.PTL_HURT_EVENT; }
     @Override
-    protected SoundEvent getDeathSound() {
-        return Ptl.PTL_HURT_EVENT;
-    }
+    protected SoundEvent getDeathSound() { return Ptl.PTL_HURT_EVENT; }
 
     @Override
     public void tick() {
         super.tick();
-        // 使用你的环境能识别的方法获取世界
+        // 【修复】使用 getEntityWorld 解决报错
         World world = this.getEntityWorld();
 
         if (!world.isClient() && this.isAlive() && !this.isBaby()) {
-
             if (--this.poopTime <= 0) {
                 this.playSound(SoundEvents.ENTITY_CHICKEN_EGG, 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
-
-                // 【测试修改 2】打印一条日志到控制台，证明逻辑跑通了
-                System.out.println("彭铁林拉屎了！位置: " + this.getBlockPos());
-
-                // 【关键修改 3】使用万能方法生成掉落物
-                // 创建一个物品实体，放在当前位置向上一点点 (y + 0.5)
-                ItemEntity poopItem = new ItemEntity(world, this.getX(), this.getY() + 0.5, this.getZ(), new ItemStack(Ptl.POOP));
-                // 给它一点随机速度，让它蹦出来
-                poopItem.setVelocity((this.random.nextFloat() - 0.5F) * 0.2F, this.random.nextFloat() * 0.2F, (this.random.nextFloat() - 0.5F) * 0.2F);
-                // 生成到世界上
-                world.spawnEntity(poopItem);
-
-                // 【测试修改 4】重置时间，继续用短时间测试
-                this.poopTime = 600; // 3秒后再次拉屎
+                if (world instanceof ServerWorld serverWorld) {
+                    this.dropStack(serverWorld, new ItemStack(Ptl.POOP));
+                }
+                this.poopTime = this.random.nextInt(6000) + 6000;
             }
         }
+    }
+
+    // =====================================================
+    // 🧠 交互逻辑：加入聊天队列
+    // =====================================================
+    @Override
+    public net.minecraft.util.ActionResult interactMob(net.minecraft.entity.player.PlayerEntity player, net.minecraft.util.Hand hand) {
+        if (hand == net.minecraft.util.Hand.MAIN_HAND) {
+
+            // 1. 繁殖逻辑优先
+            if (this.isBreedingItem(player.getStackInHand(hand))) {
+                return super.interactMob(player, hand);
+            }
+
+            // 2. 聊天逻辑 (服务端)
+            // 【修复】使用 getEntityWorld()
+            if (!this.getEntityWorld().isClient()) {
+
+                // 把玩家加入"待聊天名单"
+                Ptl.CHAT_QUEUE.put(player.getUuid(), this);
+
+                // 提示玩家
+                player.sendMessage(net.minecraft.text.Text.of("§e[系统] §f请在聊天栏输入你要对彭铁林说的话..."), false);
+            }
+
+            return net.minecraft.util.ActionResult.SUCCESS;
+        }
+        return super.interactMob(player, hand);
     }
 }
