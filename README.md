@@ -49,7 +49,7 @@
   "apiKey": "把你的_AIza_开头的Key_粘贴在这里",
   "proxyPort": 7890,
   "modelName": "gemini-1.5-flash"
-}
+}···
 
 ## 🛠️ 前置需求 (Requirements)
 
