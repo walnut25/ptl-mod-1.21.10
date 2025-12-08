@@ -1,13 +1,12 @@
 package com.ptl;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents; // 导入生命周期事件
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.MobEntityRenderer;
 import net.minecraft.client.render.entity.model.EntityModelLayer;
-import net.minecraft.client.render.entity.state.LivingEntityRenderState;
+import net.minecraft.client.render.entity.state.LivingEntityRenderState; // 基础状态类
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 
@@ -17,54 +16,66 @@ public class PtlClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        // 1. 注册渲染器
         EntityRendererRegistry.register(Ptl.PTL_ENTITY, PtlRenderer::new);
-
-        // 2. 注册模型数据
         EntityModelLayerRegistry.registerModelLayer(PTL_LAYER, PtlModel::getTexturedModelData);
-
-        // ❌ 以前的上色代码全删掉！我们要用图片了！
+        // ... (如果你有注册颜色代码，也放在这，没有就算了) ...
     }
 
     // ==========================================
-    // 生物渲染器
+    // 1. 定义自定义状态类 (继承自 LivingEntityRenderState)
+    // 专门用来存 "是否受伤" 这个额外信息
     // ==========================================
-    private static class PtlRenderer extends MobEntityRenderer<PtlEntity, LivingEntityRenderState, PtlModel> {
+    public static class PtlRenderState extends LivingEntityRenderState {
+        public boolean isHurt; // 是不是在挨打
+    }
+
+    // ==========================================
+    // 2. 修改渲染器泛型
+    // 把原来的 LivingEntityRenderState 改成我们自己的 PtlRenderState
+    // ==========================================
+    private static class PtlRenderer extends MobEntityRenderer<PtlEntity, PtlRenderState, PtlModel> {
+
+        // 定义两张皮肤的 ID
+        private static final Identifier TEXTURE_NORMAL = Identifier.of(Ptl.MOD_ID, "textures/entity/peng_tie_lin.png");
+        private static final Identifier TEXTURE_HURT = Identifier.of(Ptl.MOD_ID, "textures/entity/peng_tie_lin_hurt.png");
 
         public PtlRenderer(EntityRendererFactory.Context context) {
             super(context, new PtlModel(context.getPart(PTL_LAYER)), 0.5f);
         }
 
+        // 创建状态时，new 我们自己的类
         @Override
-        public LivingEntityRenderState createRenderState() {
-            return new LivingEntityRenderState();
+        public PtlRenderState createRenderState() {
+            return new PtlRenderState();
+        }
+
+        // 【关键】更新状态：从实体读取数据，填入 state
+        @Override
+        public void updateRenderState(PtlEntity entity, PtlRenderState state, float tickDelta) {
+            super.updateRenderState(entity, state, tickDelta);
+
+            // 如果受伤时间 > 0，说明正在挨打
+            // 或者如果死亡了 (deathTime > 0)，也可以显示痛苦面具
+            state.isHurt = entity.hurtTime > 0 || entity.deathTime > 0;
+        }
+
+        // 【关键】获取贴图：根据 state 里的数据决定用哪张图
+        @Override
+        public Identifier getTexture(PtlRenderState state) {
+            if (state.isHurt) {
+                return TEXTURE_HURT; // 痛！
+            }
+            return TEXTURE_NORMAL; // 正常
         }
 
         @Override
-        public Identifier getTexture(LivingEntityRenderState state) {
-            return Identifier.of(Ptl.MOD_ID, "textures/entity/peng_tie_lin.png");
-        }
-
-        @Override
-        protected void scale(LivingEntityRenderState state, MatrixStack matrices) {
-            // 1. 先做向下平移修正 (解决脚不沾地的问题)
+        protected void scale(PtlRenderState state, MatrixStack matrices) {
             matrices.translate(0.0F, 10.0F / 16.0F, 0.0F);
-
-            // 2. 设定基础放大倍数 (成年体是 3.5 倍)
             float size = 3.5F;
-
-            // 3. 【关键】如果是宝宝，就把体型缩小一半
-            // state.baby 是 1.21+ 新版本自带的状态判断
             if (state.baby) {
-                size *= 0.5F; // 3.5 * 0.5 = 1.75 倍
-
-                // 可选：为了让宝宝看起来更萌，Minecraft 原版通常会把宝宝的头放大
-                // 但因为我们是整体缩放，这里只是单纯变小只
+                size *= 0.5F;
                 matrices.translate(0.0F, -0.25F, 0.0F);
             }
-
-
-            // 4. 应用缩放
             matrices.scale(size, size, size);
         }
     }
